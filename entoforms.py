@@ -1,6 +1,8 @@
 import bpy
 import bmesh
 import random
+import bisect
+
 from mathutils import Vector
 
 ########################
@@ -122,7 +124,7 @@ class GenState:
             # Mutation sur un individu au hasard
             index = roulette_wheel_selection(population_fitness)
             self.population[index].mutate()
-            print(f'{bcolors.WARNING}mutate : n°{index}{bcolors.ENDC}')
+            print(f'{bcolors.OKBLUE}mutate : n°{index}{bcolors.ENDC}')
         
         if random.random() < pc:
             # d est dynamique ici car sinon seul les d derniers seront remplacé
@@ -135,7 +137,7 @@ class GenState:
                 dad_index = roulette_wheel_selection(population_fitness)
                 mom_index = roulette_wheel_selection(population_fitness)
                 childs = self.population[dad_index].crossover(self.population[mom_index])
-                print(f'{bcolors.WARNING}crossover : dad n°{dad_index} - mom n°{mom_index}{bcolors.ENDC}')
+                print(f'{bcolors.OKBLUE}crossover : dad n°{dad_index} - mom n°{mom_index}{bcolors.ENDC}')
                 
                 # On remplace les deux pires par les deux enfants
                 index = -(i + 1)
@@ -193,9 +195,10 @@ class Entoform(People):
         
         # Ajoute des données d'extrude
         self.face_total = 6
-        self.rig_location = []
+        self.bones = []
         for i in range(8):
-            self.extrude()  # TODO : créer les jambes ici 
+            self.extrude()  # TODO : créer les jambes ici  
+        self.intervals = [l for l in range(6, self.face_total + 1, 4)]
             
     # Extrude coté génotype
     def extrude(self):
@@ -210,8 +213,11 @@ class Entoform(People):
             self.genotype += width + height + depth
             
             self.face_total += 4
-            
+    
+    # Petite surchage du crossover normal
     def crossover(self, other):
+        # On va orienter l'index de découpe que l'on selectionne
+        # Ainsi il va tomber sur un parametètre et les enfants seront un peu plus cohérent 
         max = min(len(self.genotype), len(other.genotype))
         index = random.choice([i for i in range(0, max, bn)])
         
@@ -226,8 +232,8 @@ class Entoform(People):
     # Retourne les données 'formaté' du génotype
     def data(self):
         color = (
-            bitshifting(self.genotype[0:bn]) / 255,    # Red
-            bitshifting(self.genotype[bn:bn * 2]) / 255,   # Green
+            bitshifting(self.genotype[0:bn]) / 255,           # Red
+            bitshifting(self.genotype[bn:bn * 2]) / 255,      # Green
             bitshifting(self.genotype[bn * 2:bn * 3]) / 255,  # Blue
             bitshifting(self.genotype[bn * 3:bn * 4]) / 255   # Alpha
         )
@@ -248,7 +254,7 @@ class Entoform(People):
     # Rig l'entoform coté blender 
     # TODO : remove index param       
     def rigging(self, index: int, location=(0, 0, 0)):
-        if len(self.rig_location) > 0:
+        if len(self.bones) > 0:
                 
             # création de l'armature
             mode_set(mode='OBJECT')
@@ -257,19 +263,25 @@ class Entoform(People):
             armature.name = f'Armature{index}'
 
             mode_set(mode='EDIT')
-            main_bone = bpy.context.active_bone
-            for k in range(len(self.rig_location) - 1):
-                bone = armature.data.edit_bones.new(name=f'EditBone{index}-{i}')
-                bone.head = self.rig_location[k]
-                bone.tail = self.rig_location[k + 1]
-                if k > 0:
+            all_bones = [bpy.context.active_bone]
+            
+            for b in self.bones:
+                # On unpack les valeurs
+                index_parent_bone, head, tail = b.values()
+                assert len(self.bones) > index_parent_bone
+                
+                # On crée l'armature
+                bone = armature.data.edit_bones.new(name=f'Bone{index}')
+                # On lui assigne ses postions correspondante 
+                bone.head = head
+                bone.tail = tail
+                
+                if not index_parent_bone == 0:
                     bone.use_connect = True
-                    bone.use_relative_parent = True
-                    bone.parent = parent_bone
-                else:
-                    bone.use_relative_parent = True
-                    bone.parent = main_bone
-                parent_bone = bone
+                bone.use_relative_parent = True
+                bone.parent = all_bones[index_parent_bone]
+                
+                all_bones.append(bone)
             
             mode_set(mode='OBJECT')
             cube = bpy.data.objects[f'Cube{index}']
@@ -279,7 +291,7 @@ class Entoform(People):
     
     # Affiche l'entoform coté blender
     def display(self, index: int, location=(0, 0, 0)):
-        self.rig_location = []
+        self.bones = []  # On réinitialise les info des bones
         
         # on unpack les valeur
         color, scale, extrudes = self.data()
@@ -312,14 +324,25 @@ class Entoform(People):
                 # TODO : ne pas faire ca ici
                 mode_set(mode='EDIT')
                 
-                b_cube = bmesh.from_edit_mesh(cube.data)
-                selected_face = [b_face.calc_center_bounds() for b_face in b_cube.faces if b_face.select == True]
-                vec = Vector(location)
-                
+                b_cube = bmesh.from_edit_mesh(cube.data)            
+                selected_face = [b_face for b_face in b_cube.faces if b_face.select == True]        
                 assert len(selected_face) == 1
                 
-                self.rig_location += selected_face
-                self.rig_location += (selected_face[0] + vec, )
+                selected_face = selected_face[0]
+                
+                head = selected_face.calc_center_bounds()
+                tail = head + selected_face.normal
+                
+                # 0 <= et < 6   -> parent_bone = main_bone
+                # 6 <= et < 10  -> parent_bone = bone premiere extrude
+                # 10 <= et < 14 -> parent_bone = bone deuxieme extrude ...
+                
+                index_parent_bone = bisect.bisect_right(self.intervals, face) 
+                self.bones.append({
+                    'index_parent_bone': index_parent_bone,
+                    'head': head,
+                    'tail': tail
+                })
                 
                 # Déselectionne tout pour avoir seulement une face selectionné
                 deselect_all()
@@ -369,7 +392,7 @@ while True:
     for i in range(2, -1, -1):
         text = ""
         for j in range(3):
-            index = (i  * 3) + j
+            index = i + (j  * 3)
             text += f'{index} '
         print(text)
     
