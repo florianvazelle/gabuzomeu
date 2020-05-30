@@ -84,6 +84,16 @@ def roulette_wheel_selection(choices: list):
 # Classes
 ########################
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 class GenState:
     
     def __init__(self):
@@ -98,35 +108,40 @@ class GenState:
         
         # Construction du tableau de fitness
         population_fitness = [{'fitness': 1 if i in selected_objects_index else 0, 'index': i} for i in range(len(self.population))]
-        # On normalise les valeur (entre 0 et 1)
+        # On calcul la somme des fitness
         sum_fitness = sum(pop_fit['fitness'] for pop_fit in population_fitness)
-        if not sum_fitness == 0:
-            for i in range(len(population_fitness)):
-                population_fitness[i]['fitness'] = float(population_fitness[i]['fitness']) / sum_fitness
+        assert (not sum_fitness == 0)
+        
+        # On normalise les valeur (entre 0 et 1)
+        for i in range(len(population_fitness)):
+            population_fitness[i]['fitness'] = float(population_fitness[i]['fitness']) / sum_fitness
         # Et on le tri
-        population_fitness = sorted(population_fitness, key=lambda x : x['fitness'])
+        population_fitness = sorted(population_fitness, key=lambda x : x['fitness'], reverse=True)
         
         if random.random() < pm:
             # Mutation sur un individu au hasard
             index = roulette_wheel_selection(population_fitness)
             self.population[index].mutate()
+            print(f'{bcolors.WARNING}mutate : n°{index}{bcolors.ENDC}')
         
         if random.random() < pc:
             # d est dynamique ici car sinon seul les d derniers seront remplacé
             # alors que l'on aimerai que sa soit tout les non selectionnés
             d = len(self.population) - len(selected_objects_index)
-            
+
             # Fait le crossover autant de fois qu'il y a d'individu à détruire
             for i in range(0, d, 2):
                 # Crossover sur deux individus au hasard
                 dad_index = roulette_wheel_selection(population_fitness)
                 mom_index = roulette_wheel_selection(population_fitness)
                 childs = self.population[dad_index].crossover(self.population[mom_index])
+                print(f'{bcolors.WARNING}crossover : dad n°{dad_index} - mom n°{mom_index}{bcolors.ENDC}')
                 
                 # On remplace les deux pires par les deux enfants
                 index = -(i + 1)
                 self.population[population_fitness[index]['index']].genotype = childs[0]
                 self.population[population_fitness[index - 1]['index']].genotype = childs[1]
+
     
     # Applique une action sur l'ensemble de la population
     def apply(self, action: str):
@@ -182,6 +197,32 @@ class Entoform(People):
         for i in range(8):
             self.extrude()  # TODO : créer les jambes ici 
             
+    # Extrude coté génotype
+    def extrude(self):
+        if random.random() < 0.65:
+            face = to_bitlist(random.randint(0, self.face_total - 1))
+
+            width = to_bitlist(random.randint(0, 4))
+            height = to_bitlist(random.randint(0, 4))
+            depth = to_bitlist(random.randint(0, 4))
+            
+            self.genotype += face 
+            self.genotype += width + height + depth
+            
+            self.face_total += 4
+            
+    def crossover(self, other):
+        max = min(len(self.genotype), len(other.genotype))
+        index = random.choice([i for i in range(0, max, bn)])
+        
+        dad_beg = self.genotype[0:index]
+        dad_end = self.genotype[index:]
+        
+        mom_beg = other.genotype[0:index]
+        mom_end = other.genotype[index:]
+        
+        return (dad_beg + mom_end, mom_beg + dad_end)
+            
     # Retourne les données 'formaté' du génotype
     def data(self):
         color = (
@@ -203,20 +244,6 @@ class Entoform(People):
             extrudes.append([face, extrude_position])
         
         return (color, scale, extrudes)    
-    
-    # Extrude coté génotype
-    def extrude(self):
-        if random.random() < 0.65:
-            face = to_bitlist(random.randint(0, self.face_total - 1))
-
-            width = to_bitlist(random.randint(0, 4))
-            height = to_bitlist(random.randint(0, 4))
-            depth = to_bitlist(random.randint(0, 4))
-            
-            self.genotype += face 
-            self.genotype += width + height + depth
-            
-            self.face_total += 4
     
     # Rig l'entoform coté blender 
     # TODO : remove index param       
@@ -252,6 +279,8 @@ class Entoform(People):
     
     # Affiche l'entoform coté blender
     def display(self, index: int, location=(0, 0, 0)):
+        self.rig_location = []
+        
         # on unpack les valeur
         color, scale, extrudes = self.data()
         
@@ -288,7 +317,6 @@ class Entoform(People):
                 vec = Vector(location)
                 
                 assert len(selected_face) == 1
-                print(index, len(self.rig_location))
                 
                 self.rig_location += selected_face
                 self.rig_location += (selected_face[0] + vec, )
@@ -321,34 +349,8 @@ class Entoform(People):
 ########################
 # Main
 ########################
-    
-g = GenState()
 
-#while True:
-for i in range(1):
-    clear_scene()
-    g.apply('display')
-    
-#    for i in range(2, -1, -1):
-#        text = ""
-#        for j in range(3):
-#            index = (i  * 3) + j
-#            text += f'{index} '
-#        print(text)
-#    
-#    # Rafraichit la vue de blender
-#    bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-#    
-#    # Attend un input de l'utilisateur dans la console
-#    variable = input('Select cube index : ')
-#    selected_objects_index = variable.split(' ')
-#    if variable == 'e':
-#        pass  # TODO : export in obj
-#    
-#    for i in range(50):
-#        g.evolve(selected_objects_index=selected_objects_index) 
-        
-g.apply('rigging')
+selected_objects_index = []
 
 # Change le viewport shading pour pouvoir voir les shaders 
 for area in bpy.context.screen.areas: 
@@ -356,3 +358,42 @@ for area in bpy.context.screen.areas:
         for space in area.spaces: 
             if space.type == 'VIEW_3D':
                 space.shading.type = 'MATERIAL'
+    
+g = GenState()
+
+while True:
+    clear_scene()
+    
+    g.apply('display')
+    
+    for i in range(2, -1, -1):
+        text = ""
+        for j in range(3):
+            index = (i  * 3) + j
+            text += f'{index} '
+        print(text)
+    
+    # Rafraichit la vue de blender
+    bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+    
+    while True:
+        # Attend un input de l'utilisateur dans la console
+        inputs = input('Select cube index (help h): ')
+        
+        # Quick interpreter
+        if inputs == 'h': print('h - help\nq - quit\nr - rig\ne - export')
+        elif inputs == 'r': g.apply('rigging'); bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+        elif inputs == 'e': bpy.ops.export_scene.fbx(filepath="./test.fbx")    
+        else: variable = inputs; break
+    if variable == 'q': break
+    
+    # Si rien, on garde les parents précédent
+    if not len(variable) == 0:
+        selected_objects_index = [int(v) for v in variable.split(' ') if v in [str(i) for i in range(9)]]
+    
+    # Seulement si, aucun input n'a été saisi et qu'il s'agit de la première génération
+    if len(selected_objects_index) == 0:
+        # On regénére toute les individus
+        g = GenState()
+    else:
+        g.evolve(selected_objects_index=selected_objects_index)
