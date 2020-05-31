@@ -203,7 +203,7 @@ class Entoform(People):
         self.extrude_legs()
         
         # Ajoute des données d'extrude
-        for _ in range(8):
+        for _ in range(6):
             if random.random() < 0.65:
                 self.extrude() 
         self.intervals = [l for l in range(6, self.face_total + 1, 4)]
@@ -212,9 +212,9 @@ class Entoform(People):
     def extrude(self):
         face = to_bitlist(random.randint(0, self.face_total - 1))
 
-        width = to_bitlist(random.randint(-4, 4))
-        height = to_bitlist(random.randint(-4, 4))
-        depth = to_bitlist(random.randint(-4, 4))
+        width = to_bitlist(random.randint(0, 4))
+        height = to_bitlist(random.randint(0, 4))
+        depth = to_bitlist(random.randint(0, 4))
 
         self.genotype += face 
         self.genotype += width + height + depth
@@ -222,15 +222,15 @@ class Entoform(People):
         self.face_total += 4
             
     def extrude_legs(self):
-        leg_count = 6
+        leg_count = 2
         choices = [i for i in range(6)] 
         for _ in range(leg_count):
             choice = random.choice(choices)
             face = to_bitlist(choice)
 
-            width = to_bitlist(random.randint(-7, -4))
-            height = to_bitlist(random.randint(-7, -4))
-            depth = to_bitlist(random.randint(-7, -4))
+            width = to_bitlist(random.randint(4, 7))
+            height = to_bitlist(random.randint(4, 7))
+            depth = to_bitlist(random.randint(4, 7))
                 
             self.genotype += face 
             self.genotype += width + height + depth  
