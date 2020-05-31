@@ -392,6 +392,10 @@ class Entoform(People):
               
         cube.data.materials.append(material)
 
+        # pour avoir une meilleur qualité
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.context.object.modifiers["Subdivision"].levels = 2
+
 
 ########################
 # Main
