@@ -49,20 +49,23 @@ def clear_scene():
 # Convertie un tableau de bit, en un entier en base 10
 def bitshifting(bitlist: list):
     out = 0
-    for bit in bitlist:
+    # Le premier bit est réservé au signe
+    sign = 1 if bitlist[0] == 0 else -1
+    for bit in bitlist[1:]:
         out = (out << 1) | bit
-    return out
+    return out * sign
 
 # Convertie un entier en un tableau de bit
 def to_bitlist(number: int):
-    out = []
-    bits = "{0:b}".format(number)
+    # Le premier bit est réservé au signe
+    out = [0 if number >= 0 else 1]    
+    bits = "{0:b}".format(abs(number))
     # Si trop de bits
-    if len(bits) > bn:
+    if len(bits) > (bn - 1):
         # On prend seulement les bn dernier bit
-        bits = bits[len(bits) - 8:]
+        bits = bits[len(bits) - (bn - 1):]
     # Si pas assez de bits
-    for i in range(8 - len(bits)):
+    for _ in range((bn - 1) - len(bits)):
         # On ajoute des zéro
         out.append(0)
     for bit in bits:
