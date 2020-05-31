@@ -196,26 +196,47 @@ class Entoform(People):
         # Initalisation du génotype avec couleur (4 = rgba) et scale (1)
         super().__init__(5)
         
-        # Ajoute des données d'extrude
         self.face_total = 6
         self.bones = []
-        for i in range(8):
-            self.extrude()  # TODO : créer les jambes ici  
+        
+        # Création des jambes
+        self.extrude_legs()
+        
+        # Ajoute des données d'extrude
+        for _ in range(8):
+            if random.random() < 0.65:
+                self.extrude() 
         self.intervals = [l for l in range(6, self.face_total + 1, 4)]
             
     # Extrude coté génotype
     def extrude(self):
-        if random.random() < 0.65:
-            face = to_bitlist(random.randint(0, self.face_total - 1))
+        face = to_bitlist(random.randint(0, self.face_total - 1))
 
-            width = to_bitlist(random.randint(0, 4))
-            height = to_bitlist(random.randint(0, 4))
-            depth = to_bitlist(random.randint(0, 4))
+        width = to_bitlist(random.randint(-4, 4))
+        height = to_bitlist(random.randint(-4, 4))
+        depth = to_bitlist(random.randint(-4, 4))
+
+        self.genotype += face 
+        self.genotype += width + height + depth
             
+        self.face_total += 4
+            
+    def extrude_legs(self):
+        leg_count = 6
+        choices = [i for i in range(6)] 
+        for _ in range(leg_count):
+            choice = random.choice(choices)
+            face = to_bitlist(choice)
+
+            width = to_bitlist(random.randint(-7, -4))
+            height = to_bitlist(random.randint(-7, -4))
+            depth = to_bitlist(random.randint(-7, -4))
+                
             self.genotype += face 
-            self.genotype += width + height + depth
-            
+            self.genotype += width + height + depth  
             self.face_total += 4
+
+            choices.pop(choices.index(choice))   
     
     # Petite surchage du crossover normal
     def crossover(self, other):
