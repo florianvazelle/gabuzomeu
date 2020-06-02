@@ -114,12 +114,12 @@ class GenState:
         # Construction du tableau de fitness
         population_fitness = [{'fitness': 1 if i in selected_objects_index else 0, 'index': i} for i in range(len(self.population))]
         # On calcul la somme des fitness
-        sum_fitness = sum(pop_fit['fitness'] for pop_fit in population_fitness)
-        assert (not sum_fitness == 0)
+        max_fitness = max(pop_fit['fitness'] for pop_fit in population_fitness)
+        assert (not max_fitness == 0)
         
         # On normalise les valeur (entre 0 et 1)
         for i in range(len(population_fitness)):
-            population_fitness[i]['fitness'] = float(population_fitness[i]['fitness']) / sum_fitness
+            population_fitness[i]['fitness'] = float(population_fitness[i]['fitness']) / max_fitness
         # Et on le tri
         population_fitness = sorted(population_fitness, key=lambda x : x['fitness'], reverse=True)
         
